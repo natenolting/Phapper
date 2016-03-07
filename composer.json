@@ -1,0 +1,35 @@
+{
+  "name": "rotorcowboy/Phapper",
+  "description": "PHP Reddit API wrapper",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "rotorcowboy",
+      "email": "rotorcowboy@reddit.com"
+    },
+    {
+      "name": "Nate Nolting",
+      "email": "naten@paulbunyan.net"
+    }
+  ],
+  "require": {
+    "php": ">=5.4.0",
+    "guzzlehttp/guzzle": "^6.1",
+    "vlucas/phpdotenv": "^2.2"
+  },
+  "require-dev": {
+    "fzaninotto/faker": "^1.5",
+    "phpunit/phpunit": "^4.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "Phapper\\": "src/"
+    }
+  },
+  "minimum-stability": "stable",
+  "scripts": {
+    "test": [
+      "phpunit --verbose --coverage-text"
+    ]
+  }
+}
