@@ -14,4 +14,5 @@ $config = new Phapper\Config([
 ]);
 
 $reddit = new Phapper\Phapper($config);
+// get me!
 var_dump($reddit->getMe());

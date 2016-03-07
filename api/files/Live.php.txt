@@ -6,11 +6,11 @@ namespace Phapper;
 class Live {
     /** @var Phapper */
     private $phapper;
-    private $thread_id;
+    private $threadId;
 
-    public function __construct($phapper, $thread_id) {
+    public function __construct($phapper, $threadId) {
         $this->phapper = $phapper;
-        $this->thread_id = $thread_id;
+        $this->threadId = $threadId;
     }
 
     /**
@@ -18,7 +18,7 @@ class Live {
      * @return string Thread ID.
      */
     public function getThreadId() {
-        return $this->thread_id;
+        return $this->threadId;
     }
 
     /**
@@ -375,10 +375,10 @@ class Live {
     }
 
     public function apiCall($path, $method = 'GET', $params = null) {
-        return $this->phapper->apiCall("/api/live/{$this->thread_id}$path", $method, $params);
+        return $this->phapper->apiCall("/api/live/{$this->threadId}$path", $method, $params);
     }
 
     public function liveCall($path, $method = 'GET', $params = null) {
-        return $this->phapper->apiCall("/live/{$this->thread_id}$path", $method, $params);
+        return $this->phapper->apiCall("/live/{$this->threadId}$path", $method, $params);
     }
 }

@@ -1,0 +1,78 @@
+<?php
+
+namespace Phapper;
+
+/**
+ * Class Config
+ * @package Phapper
+ */
+/**
+ * Class Config
+ * @package Phapper
+ */
+class Config
+{
+    /**
+     * @var string
+     */
+    var $username = '';
+    /**
+     * @var string
+     */
+    var $password = '';
+    /**
+     * @var string
+     */
+    var $appId = '';
+    /**
+     * @var string
+     */
+    var $appSecret = '';
+
+    /**
+     * @var string
+     */
+    var $userAgent = '[YOUR SCRIPT PURPOSE HERE] by /u/[YOUR USERNAME HERE] (Phapper 1.0)';
+
+    /**
+     * @var string
+     */
+    var $oauthEndpoint = 'https://oauth.reddit.com';
+    /**
+     * @var string
+     */
+    var $basicEndpoint = 'https://www.reddit.com';
+
+    /**
+     * @var bool
+     */
+    var $debug = false;
+
+    /**
+     * @param array $config
+     */
+    public function __construct(array $config = [])
+    {
+        $this->set($config);
+        return $this;
+    }
+
+    /**
+     * @param $key
+     * @param $value
+     * @return $this
+     */
+    public function set($key, $value = "")
+    {
+        if (is_array($key)) {
+            return array_map(function ($k, $v) {
+                if (property_exists($this, $k)) {
+                    return $this->{$k} = $v;
+                }
+                return false;
+            }, array_keys($key), array_values($key));
+        }
+        $this->{$key} = $value;
+        return $this;
+    }
+}
