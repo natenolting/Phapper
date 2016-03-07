@@ -1,42 +1,31 @@
 <?php
-
 namespace Phapper;
 
-require_once(__DIR__.'/../config.php');
-require_once(__DIR__.'/inc/oauth2.php');
-require_once(__DIR__.'/inc/ratelimiter.php');
-require_once(__DIR__.'/inc/live.php');
-
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Psr7\Request;
 
 class Phapper {
     /** @var OAuth2 */
     private $oauth2;
 
     /** @var RateLimiter */
-    public $ratelimiter;
+    public $rateLimiter;
 
     private $user_id;
-    private $user_agent;
-    private $basic_endpoint;
-    private $oauth_endpoint;
+    private $userAgent;
+    private $basicEndpoint;
+    private $oauthEndpoint;
 
     private $debug;
 
-    public function __construct($username = null, $password = null, $app_id = null, $app_secret = null, $user_agent = null, $basic_endpoint = null, $oauth_endpoint = null) {
-        $reddit_username = (is_null($username)) ? PhapperConfig::$username : $username;
-        $reddit_password = (is_null($password)) ? PhapperConfig::$password : $password;
-        $reddit_app_id = (is_null($app_id)) ? PhapperConfig::$app_id : $app_id;
-        $reddit_app_secret = (is_null($app_secret)) ? PhapperConfig::$app_secret : $app_secret;
-        $phapper_user_agent = (is_null($user_agent)) ? PhapperConfig::$user_agent : $user_agent;
-        $reddit_basic_endpoint = (is_null($basic_endpoint)) ? PhapperConfig::$basic_endpoint : $basic_endpoint;
-        $reddit_oauth_endpoint = (is_null($oauth_endpoint)) ? PhapperConfig::$oauth_endpoint : $oauth_endpoint;
-
-        $this->oauth2 = new OAuth2($reddit_username, $reddit_password, $reddit_app_id, $reddit_app_secret, $phapper_user_agent, $reddit_basic_endpoint);
-        $this->ratelimiter = new RateLimiter(true, 1);
-        $this->user_agent = $phapper_user_agent;
-        $this->basic_endpoint = $reddit_basic_endpoint;
-        $this->oauth_endpoint = $reddit_oauth_endpoint;
-        $this->debug = false;
+    public function __construct(Config $config) {
+        $this->oauth2 = new OAuth2($config);
+        $this->rateLimiter = new RateLimiter(true, 1);
+        $this->userAgent = $config->userAgent;
+        $this->basicEndpoint = $config->basicEndpoint;
+        $this->oauthEndpoint = $config->oauthEndpoint;
+        $this->debug = $config->debug;
     }
 
     public function setDebug($debug) {
@@ -3371,77 +3360,73 @@ class Phapper {
     //-----------------------------------------
     // API
     //-----------------------------------------
-    public function apiCall($path, $method = 'GET', $params = null, $json = false) {
+    public function apiCall($path, $method = 'GET', $params = null, $json = false)
+    {
         //Prepare request URL
-        $url = $this->oauth_endpoint.$path;
+        $url = $this->oauthEndpoint . $path;
 
         //Obtain access token for authentication
         $token = $this->oauth2->getAccessToken();
 
-        //Prepare cURL options
-        $options[CURLOPT_RETURNTRANSFER] = true;
-        $options[CURLOPT_CONNECTTIMEOUT] = 10;
-        $options[CURLOPT_TIMEOUT] = 30;
-        $options[CURLOPT_USERAGENT] = $this->user_agent;
-        $options[CURLOPT_CUSTOMREQUEST] = $method;
-        $options[CURLOPT_HTTPHEADER][] = "Authorization: ".$token['token_type']." ".$token['access_token'];
-
-        if ($json) {
-            $options[CURLOPT_HTTPHEADER][] = "Content-Type: application/json";
-        }
+        //Build Client
+        $client = new Client(
+            [
+                'timeout' => 10,
+                'debug' => $this->debug,
+            ]
+        );
 
         //Execution is placed in a loop in case CAPTCHA is required.
-        do{
-            //Prepare URL or POST parameters
-            if (isset($params)) {
-                if ($method == 'GET') {
-                    $url .= '?'.http_build_query($params);
-                }
-                else {
-                    $options[CURLOPT_POSTFIELDS] = $params;
-                }
-            }
+        do {
 
-            //Build cURL object
-            $ch = curl_init($url);
-            curl_setopt_array($ch, $options);
-
+            $request = new Request($method, $url);
             //Wait on rate limiter if necessary
-            $this->ratelimiter->wait();
+            $this->rateLimiter->wait();
 
             //Print request URL for debug
             if ($this->debug) {
-                echo $url."\n";
+                echo $url . "\n";
             }
 
             //Send request and close connection
-            $response_raw = curl_exec($ch);
-            curl_close($ch);
-
+            try {
+                $response = $client->send($request, array_merge(
+                    (array)$params,
+                    [
+                        'timeout' => 30,
+                        'headers' => [
+                            'User-Agent' => $this->userAgent,
+                            'Authorization' => $token['token_type'] . " " . $token['access_token'],
+                        ]
+                    ]
+                ));
+                $responseRaw = $response->getBody();
+            } catch (ClientException $ex) {
+                $message = $ex->getResponse();
+                $responseRaw = $message->getBody()->getContents();
+            }
             //Parse response
-            $response = json_decode($response_raw);
+            $responseData = json_decode($responseRaw);
             if ($json_error = json_last_error()) {
-                $response = $response_raw;
+                $responseData = $responseRaw;
             }
 
-            if (isset($response->json->captcha)) {
-                $params['iden'] = $response->json->captcha;
-                $params['captcha'] = $this->getCaptchaResponse($response->json->captcha);
+            if (isset($responseData->json->captcha)) {
+                $params['iden'] = $responseData->json->captcha;
+                $params['captcha'] = $this->getCaptchaResponse($responseData->json->captcha);
                 $needs_captcha = ($params['captcha'] === 'skip') ? false : true;
-            }
-            else {
+            } else {
                 $needs_captcha = false;
             }
         } while ($needs_captcha);
 
-
-        return $response;
+        return $responseData;
     }
 
     private function getCaptchaResponse($iden) {
         fwrite(STDERR, "\n==============================================================================\n");
         fwrite(STDERR, "CAPTCHA REQUIRED!\nPlease visit this link and type in the letters you see in the picture.\n\n");
-        fwrite(STDERR, "{$this->basic_endpoint}/captcha/$iden\n");
+        fwrite(STDERR, "{$this->basicEndpoint}/captcha/$iden\n");
         fwrite(STDERR, "\n(Too hard? Leave blank to request another. To skip this command, type 'skip'.)");
         fwrite(STDERR, "\n==============================================================================\n");
         $answer = readline("Response: ");

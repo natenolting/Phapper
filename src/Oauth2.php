@@ -2,52 +2,52 @@
 
 namespace Phapper;
 
+use Phapper\Exception\RedditAuthenticationException;
 
 class OAuth2 {
-    private $access_token;
-    private $token_type;
+    private $accessToken;
+    private $tokenType;
     private $expiration;
     private $scope;
 
     public $username;
     private $password;
-    private $app_id;
-    private $app_secret;
-    private $user_agent;
-    private $endpoint;
+    private $appId;
+    private $appSecret;
+    private $userAgent;
+    private $apiEndpoint;
 
-    public function __construct($username, $password, $app_id, $app_secret, $user_agent, $endpoint) {
-        $this->username = $username;
-        $this->password = $password;
-        $this->app_id = $app_id;
-        $this->app_secret = $app_secret;
-        $this->user_agent = $user_agent;
-        $this->endpoint = $endpoint;
-
+    public function __construct(Config $config) {
+        $this->username = $config->username;
+        $this->password = $config->password;
+        $this->appId = $config->appId;
+        $this->appSecret = $config->appSecret;
+        $this->userAgent = $config->userAgent;
+        $this->apiEndpoint = $config->basicEndpoint;
         $this->requestAccessToken();
     }
 
     public function getAccessToken() {
-        if (!(isset($this->access_token) && isset($this->token_type) && time()<$this->expiration)) {
+        if (!(isset($this->accessToken) && isset($this->tokenType) && time()<$this->expiration)) {
             $this->requestAccessToken();
         }
 
         return array(
-            'access_token' => $this->access_token,
-            'token_type' => $this->token_type
+            'access_token' => $this->accessToken,
+            'token_type' => $this->tokenType
         );
     }
 
     private function requestAccessToken() {
-        $url = "{$this->endpoint}/api/v1/access_token";
+        $url = "{$this->apiEndpoint}/api/v1/access_token";
         $params = array(
             'grant_type' => 'password',
             'username' => $this->username,
             'password' => $this->password
         );
 
-        $options[CURLOPT_USERAGENT] = $this->user_agent;
-        $options[CURLOPT_USERPWD] = $this->app_id.':'.$this->app_secret;
+        $options[CURLOPT_USERAGENT] = $this->userAgent;
+        $options[CURLOPT_USERPWD] = $this->appId.':'.$this->appSecret;
         $options[CURLOPT_RETURNTRANSFER] = true;
         $options[CURLOPT_CONNECTTIMEOUT] = 5;
         $options[CURLOPT_TIMEOUT] = 10;
@@ -82,19 +82,9 @@ class OAuth2 {
             }
         }
 
-        $this->access_token = $response->access_token;
-        $this->token_type = $response->token_type;
+        $this->accessToken = $response->access_token;
+        $this->tokenType = $response->token_type;
         $this->expiration = time()+$response->expires_in;
         $this->scope = $response->scope;
-    }
-}
-
-class RedditAuthenticationException extends \Exception {
-    public function __construct($message, $code = 0, \Exception $previous = null) {
-        parent::__construct($message, $code, $previous);
-    }
-
-    public function __toString() {
-        return __CLASS__.": [{$this->code}]: {$this->message}";
     }
 }
